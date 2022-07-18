@@ -139,7 +139,7 @@ function ArnoldiGrad(A, v; lowerBound=0, upperBound=1e16, tol=1e-3, D=ones(1, n)
     return w, q, eig[1]
 end
 
-function gammaLineSearch(A, v, q; ε=1e-4)
+function gammaLineSearch(A, v, q; ε=1e-8)
     b = 0
     e = 1
     while e - b > ε
@@ -160,9 +160,26 @@ function gammaLineSearch(A, v, q; ε=1e-4)
     return (e + b) / 2
 end
 
-function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e16, printIter=false, plot=false, linesearch=false)
+function CutValue(A, z)
+    rows = rowvals(A)
+    vals = nonzeros(A)
+    r = spzeros(n)
+
+    for i in 1:n
+        for k in nzrange(A, i)
+            r[i] += (vals[k] * z[rows[k]])
+        end
+        r[i] = sign(r[i])
+    end
+    #disp(r' * A' * A * r / 2)
+    return r' * A' * A * r / 2
+
+end
+
+function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e16, printIter=false, plot=false, linesearch=false, numSample=1)
     v = v0
-    t = 0
+    t = t0
+    z = rand(Normal(0, 1 / m), (numSample, m))
     start = t0
     if !linesearch
         gamma = 2 / (t + start)
@@ -176,10 +193,9 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
     end
     w, q, λ = ArnoldiGrad(A, v, lowerBound=lowerBound, upperBound=upperBound, D=D, tol=ε)
     gap = dot(q - v, ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)) / abs(f(A, v))
+    εd0 = 0
     while gap > ε
-        if printIter
-            println(t, ": ", abs(f(A, v)), " ", gap)
-        end
+
         if plot
             append!(flog, abs(f(A, v)))
             #append!(timelog, time())
@@ -196,17 +212,46 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
         end
         v = (1 - gamma) * v + gamma * q
 
+        for i in 1:10
+            z[i, :] = sqrt(1 - gamma) * z[i, :] + sqrt(gamma) * w * rand(Normal(0, 1))
+        end
+
         if !linesearch
             gamma = 2 / (t + start)
         end
         w, q, λ = ArnoldiGrad(A, v, lowerBound=lowerBound, upperBound=upperBound, D=D, tol=ε)
         gap = dot(q - v, ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)) / abs(f(A, v))
+        if gap < 10^(εd0)
+            println(t, ": ", abs(f(A, v)), " ", gap)
+            εd0 = εd0 - 0.5
+        else
+            print('-')
+        end
     end
     if plot
-        result = (val=f(A, v), v=v, t=t, plot=flog, time=timelog, gamma=gammalog, mingrad=mingrad, maxgrad=maxgrad)
+        append!(flog, abs(f(A, v)))
+        bestRes = 0
+        bestIdx = 0
+        for i in 1:numSample
+            cut = CutValue(A, z[i, :])
+            if cut > bestRes
+                bestRes = cut
+                bestIdx = i
+            end
+        end
+        result = (val=f(A, v), v=v, t=t, plot=flog, time=timelog, gamma=gammalog, mingrad=mingrad, maxgrad=maxgrad, z=z[bestIdx, :])
         return result
     else
-        result = (val=f(A, v), v=v, t=t)
+        bestRes = 0
+        bestIdx = 0
+        for i in 1:numSample
+            cut = CutValue(A, z[i, :])
+            if cut > bestRes
+                bestRes = cut
+                bestIdx = i
+            end
+        end
+        result = (val=f(A, v), v=v, t=t, z=z[bestIdx, :])
         return result
     end
 
