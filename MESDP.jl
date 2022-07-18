@@ -171,8 +171,9 @@ function CutValue(A, z)
         end
         r[i] = sign(r[i])
     end
+    #disp(r)
     #disp(r' * A' * A * r / 2)
-    return r' * A' * A * r / 2
+    return r' * A' * A * r
 
 end
 
@@ -212,7 +213,7 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
         end
         v = (1 - gamma) * v + gamma * q
 
-        for i in 1:10
+        for i in 1:numSample
             z[i, :] = sqrt(1 - gamma) * z[i, :] + sqrt(gamma) * w * rand(Normal(0, 1))
         end
 
@@ -223,7 +224,7 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
         gap = dot(q - v, ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)) / abs(f(A, v))
         if gap < 10^(εd0)
             println(t, ": ", abs(f(A, v)), " ", gap)
-            εd0 = εd0 - 0.5
+            εd0 = εd0 - 0.25
         else
             print('-')
         end

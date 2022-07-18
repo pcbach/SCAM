@@ -22,6 +22,7 @@ function exp1(inputFile, outputFile, optimalValue, label; linesearch=false, ε=1
             D[i] += 1
         end
     end
+    disp(sum(D) / minimum(D))
     rows = nothing
     vals = nothing
 
@@ -46,33 +47,44 @@ function exp1(inputFile, outputFile, optimalValue, label; linesearch=false, ε=1
     disp(f(A_s,v))=#
     #########################################################
     #disp(result1.val^2 / 2)
-    if linesearch
-        color = :red
-    else
-        color = :blue
-    end
-
-    if t0 == 0
-        style = :solid
-    else
-        style = :dash
-    end
     plot!(log10.(t0 - 1 .+ (1:length(result1.plot))), log10.((opt .- result1.plot) ./ opt), ratio=:equal, label=label, dpi=300, size=(1000, 1000),
-        lw=3, lc=color, ls=style, legend_font_pointsize=20, tickfontsize=20, legend_position=:bottomleft)
+        lw=3, legend_font_pointsize=20, tickfontsize=20, legend_position=:bottomleft)
     if outputFile !== nothing
         savefig(outputFile)
     end
     r = result1.z
-    disp(CutValue(A_s, r))
+    disp(CutValue(A_s, r) / 2)
+    #disp(result1.val)
     return (v=result1.v, t=result1.t, z=result1.z)
 end
 #"C:/Users/pchib/Desktop/MASTER/MESDP/toy.txt"
 #print(m,n)
-opt = 3175
 ε1 = 1e-2
 ε2 = 1e-3
-inputfile = "C:/Users/pchib/Desktop/MASTER/MESDP/Gset/g16.txt"
-#outputfile = "C:/Users/pchib/Desktop/MASTER/MESDP/Result/exp1/toy.png"
+
+opt = 12083
+inputfile = "Gset/g1.txt"
 result = exp1(inputfile, nothing, opt,
-    "Test", ε=ε2, linesearch=false)
+    "G1", ε=3e-2, linesearch=true)
+
+opt = 3191.6
+inputfile = "Gset/g14.txt"
+result = exp1(inputfile, nothing, opt,
+    "G14", ε=3e-2, linesearch=true)
+
+opt = 7032.2
+inputfile = "Gset/g43.txt"
+result = exp1(inputfile, nothing, opt,
+    "G43", ε=3e-2, linesearch=true)
+
+opt = 6000
+inputfile = "Gset/g48.txt"
+result = exp1(inputfile, nothing, opt,
+    "G48", ε=3e-2, linesearch=true)
+
+opt = 14136
+inputfile = "Gset/g22.txt"
+result = exp1(inputfile, "Result/exp1/G1-14-22.png", opt,
+    "G22", ε=3e-2, linesearch=true)
 #disp(result.z)
+
