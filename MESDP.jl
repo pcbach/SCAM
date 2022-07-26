@@ -15,11 +15,13 @@ using SparseArrays
 #==============================MISC=============================#
 #Julia Display with endline
 function disp(quan; name="")
+    #print("____________________________\n")
     if name != ""
         print(name, ":\n")
     end
     display(quan)
-    print('\n')
+    #print("\n____________________________")
+    print("\n")
 end
 
 #==========================BASIC=ALGORITHM======================#
@@ -130,8 +132,8 @@ function solvesampTrue(A, v0; t0=2, ε=1e-3, lowerBound=0, upperBound=1e16)
     return result
 end
 
-function ArnoldiGrad(A, v; lowerBound=0, upperBound=1e16, tol=1e-3, D=ones(1, n))
-    decomp, history = partialschur(A, v, tol=tol, which=LM(), lowerBound=lowerBound, upperBound=upperBound, D=D, mindim=6, maxdim=12)
+function ArnoldiGrad(A, v; lowerBound=0, upperBound=1e16, tol=1e-5, D=ones(1, n))
+    decomp, history = partialschur(A, v, tol=tol, which=LM(), lowerBound=lowerBound, upperBound=upperBound, D=D)#, mindim=6, maxdim=12)
     eig, eigv = partialeigen(decomp)
     w = eigv[:, 1]
     w = w / norm(w)
@@ -143,14 +145,10 @@ function gammaLineSearch(A, v, q; ε=1e-8)
     b = 0
     e = 1
     while e - b > ε
-        #println(b, " ", e)
-        # Find the mid1 and mid2
         mid1 = b + (e - b) / 3
         mid2 = e - (e - b) / 3
         vmid1 = (1 - mid1) * v + mid1 * q
         vmid2 = (1 - mid2) * v + mid2 * q
-        #disp(vmid1)
-        #disp(vmid2)
         if f(A, vmid1) < f(A, vmid2)
             b = mid1
         else
@@ -180,13 +178,14 @@ end
 function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e16, printIter=false, plot=false, linesearch=false, numSample=1)
     v = v0
     t = t0
-    z = rand(Normal(0, 1 / m), (numSample, m))
+    z = rand(Normal(0, sqrt(1 / m)), (numSample, m))
     start = t0
     if !linesearch
         gamma = 2 / (t + start)
     end
     if plot
-        flog = zeros(0)
+        xlog = zeros(0)
+        ylog = zeros(0)
         timelog = zeros(0)
         gammalog = zeros(0)
         mingrad = zeros(0)
@@ -195,10 +194,13 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
     w, q, λ = ArnoldiGrad(A, v, lowerBound=lowerBound, upperBound=upperBound, D=D, tol=ε)
     gap = dot(q - v, ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)) / abs(f(A, v))
     εd0 = 0
-    while gap > ε
+    if plot
+        append!(ylog, abs(f(A, v)))
+    end
 
+    while gap > ε
         if plot
-            append!(flog, abs(f(A, v)))
+            append!(ylog, abs(f(A, v)))
             #append!(timelog, time())
             #append!(gammalog, gammaLineSearch(A, v, q))
             #grad = ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)
@@ -223,14 +225,23 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
         w, q, λ = ArnoldiGrad(A, v, lowerBound=lowerBound, upperBound=upperBound, D=D, tol=ε)
         gap = dot(q - v, ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)) / abs(f(A, v))
         if gap < 10^(εd0)
-            println(t, ": ", abs(f(A, v)), " ", gap)
-            εd0 = εd0 - 0.25
-        else
+            bestRes = 0
+            bestIdx = 0
+            for i in 1:numSample
+                cut = CutValue(A, z[i, :])
+                if cut > bestRes
+                    bestRes = cut
+                    bestIdx = i
+                end
+            end
+            cutValue = CutValue(A, z[bestIdx, :]) / 2
+            println(t, ": ", round.(abs(f(A, v)); digits=3), " ", round.(log10(abs(gap)); digits=3), " ", cutValue)
+            εd0 = εd0 - 0.1
+        elseif (t % 10 == 0)
             print('-')
         end
     end
     if plot
-        append!(flog, abs(f(A, v)))
         bestRes = 0
         bestIdx = 0
         for i in 1:numSample
@@ -240,7 +251,16 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
                 bestIdx = i
             end
         end
-        result = (val=f(A, v), v=v, t=t, plot=flog, time=timelog, gamma=gammalog, mingrad=mingrad, maxgrad=maxgrad, z=z[bestIdx, :])
+        if plot
+            append!(ylog, abs(f(A, v)))
+            #append!(timelog, time())
+            #append!(gammalog, gammaLineSearch(A, v, q))
+            #grad = ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)
+            #append!(mingrad, minimum(grad))
+            #append!(maxgrad, maximum(grad))
+        end
+        cutValue = Int64(CutValue(A, z[bestIdx, :]) / 2)
+        result = (val=f(A, v), v=v, t=t, plot=(x=xlog, y=ylog), time=timelog, gamma=gammalog, mingrad=mingrad, maxgrad=maxgrad, z=z[bestIdx, :])
         return result
     else
         bestRes = 0

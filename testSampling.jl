@@ -1,7 +1,9 @@
 include("MESDP.jl")
 include("ReadGSet.jl")
-
 using Plots
+
+
+colorCount = 2
 #Single graph with individual bound on the gradient
 function exp1(inputFile, outputFile, optimalValue, label; linesearch=false, ε=1e-2, v0=nothing, t0=0)
     file = inputFile
@@ -22,12 +24,11 @@ function exp1(inputFile, outputFile, optimalValue, label; linesearch=false, ε=1
             D[i] += 1
         end
     end
-    disp(sum(D) / minimum(D))
     rows = nothing
     vals = nothing
 
     v = B(A_s, P=diagm(ones(m)) / m)
-    #disp(v)
+    disp(f(A_s, v), name="f(x)")
     p = nothing
     t = 2
     opt = sqrt(optimalValue * 2)
@@ -35,7 +36,14 @@ function exp1(inputFile, outputFile, optimalValue, label; linesearch=false, ε=1
         v = v0
         t = t0
     end
-    result1 = Solve(A_s, v, t0=t, D=D, lowerBound=opt, upperBound=opt * 2, printIter=true, plot=true, linesearch=linesearch, ε=ε, numSample=10)
+
+    #=
+    for i in 1:20
+        z = rand(Normal(0, sqrt(1 / m)), (1, m))
+        disp(CutValue(A_s, z[1, :]) / 2)
+    end
+    =#
+    result1 = Solve(A_s, v, t0=t, D=D, lowerBound=opt, upperBound=opt * 2, printIter=true, plot=true, linesearch=linesearch, ε=ε, numSample=1)
     ########################################################
     #=P = Badj(A_s,result1.v)
     disp(P)
@@ -47,44 +55,77 @@ function exp1(inputFile, outputFile, optimalValue, label; linesearch=false, ε=1
     disp(f(A_s,v))=#
     #########################################################
     #disp(result1.val^2 / 2)
-    plot!(log10.(t0 - 1 .+ (1:length(result1.plot))), log10.((opt .- result1.plot) ./ opt), ratio=:equal, label=label, dpi=300, size=(1000, 1000),
-        lw=3, legend_font_pointsize=20, tickfontsize=20, legend_position=:bottomleft)
+    plotx = t0 - 1 .+ (1:length(result1.plot.y))
+    #ploty = log10.(opt .- (result1.plot))
+    ploty = (opt .- result1.plot.y) ./ opt
+    #ploty = result1.plot.y
+    #disp(plotx)
+    #disp(ploty)
+    if linesearch
+        style = :dash
+    else
+        style = :solid
+    end
+    plot!(log10.(plotx), log10.(ploty), label=label, dpi=300, size=(1000, 1000), color=Int64(floor(colorCount / 2)),
+        lw=3, legend_font_pointsize=20, tickfontsize=20, legend_position=:bottomleft, style=style)
+    #=plotyTheo = log10.(((32 * sum(D) / minimum(D)) ./ (plotx)))
+    plot!(log10.(plotx), plotyTheo, label="", dpi=300, size=(1000, 1000), color=colorCount,
+        lw=3, style=:dash, legend_font_pointsize=20, tickfontsize=20, legend_position=:bottomleft)
+
+
+    =#
+    global colorCount = colorCount + 1
     if outputFile !== nothing
         savefig(outputFile)
     end
     r = result1.z
-    disp(CutValue(A_s, r) / 2)
+    disp(CutValue(A_s, r) / 2, name="Cut Value")
+    disp(result1.val^2 / 2, name="Primal objective")
     #disp(result1.val)
     return (v=result1.v, t=result1.t, z=result1.z)
 end
 #"C:/Users/pchib/Desktop/MASTER/MESDP/toy.txt"
 #print(m,n)
-ε1 = 1e-2
+ε1 = 10^(-2)
 ε2 = 1e-3
+pyplot();
 
-opt = 12083
-inputfile = "Gset/g1.txt"
-result = exp1(inputfile, nothing, opt,
-    "G1", ε=3e-2, linesearch=true)
-
-opt = 3191.6
+opt = 3191.566782866967
 inputfile = "Gset/g14.txt"
 result = exp1(inputfile, nothing, opt,
-    "G14", ε=3e-2, linesearch=true)
-
-opt = 7032.2
-inputfile = "Gset/g43.txt"
+    "G14ls", ε=ε1, linesearch=true)
+opt = 3191.566782866967
+inputfile = "Gset/g14.txt"
 result = exp1(inputfile, nothing, opt,
-    "G43", ε=3e-2, linesearch=true)
+    "G14", ε=ε1, linesearch=false)
+
 
 opt = 6000
 inputfile = "Gset/g48.txt"
 result = exp1(inputfile, nothing, opt,
-    "G48", ε=3e-2, linesearch=true)
+    "G48", ε=ε1, linesearch=true)
+opt = 6000
+inputfile = "Gset/g48.txt"
+result = exp1(inputfile, nothing, opt,
+    "G48", ε=ε1, linesearch=false)
 
-opt = 14136
+
+opt = 8018.623274609614
+inputfile = "Gset/g37.txt"
+result = exp1(inputfile, nothing, opt,
+    "G37ls", ε=ε1, linesearch=true)
+opt = 8018.623274609614
+inputfile = "Gset/g37.txt"
+result = exp1(inputfile, nothing, opt,
+    "G37", ε=ε1, linesearch=false)
+
+
+opt = 14135.94557910069
 inputfile = "Gset/g22.txt"
-result = exp1(inputfile, "Result/exp1/G1-14-22.png", opt,
-    "G22", ε=3e-2, linesearch=true)
-#disp(result.z)
+result = exp1(inputfile, nothing, opt,
+    "G22ls", ε=ε1, linesearch=true)
+opt = 14135.94557910069
+inputfile = "Gset/g22.txt"
+result = exp1(inputfile, "Result/exp1/G14-G48-G37-G22_low.png", opt,
+    "G22", ε=ε1, linesearch=false)
 
