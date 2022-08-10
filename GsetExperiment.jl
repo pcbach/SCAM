@@ -4,7 +4,7 @@ using Plots
 
 colorCount = 1
 Result = zeros((29, 2))
-function exp1(inputFile, optimalValue, label; linesearch=false, ε=1e-2, v0=nothing, t0=0, new=false)
+function exp1(inputFile, optimalValue, label; linesearch=false, ε=1e-2, v0=nothing, t0=0, mode="new")
     file = inputFile
     A = readfile(file)
     global m = size(A, 1)
@@ -16,7 +16,7 @@ function exp1(inputFile, optimalValue, label; linesearch=false, ε=1e-2, v0=noth
 
     opt = sqrt(optimalValue * 2)
     #Calculate graph degree
-    if new
+    if mode == "new"
         rows = rowvals(A_s)
         vals = nonzeros(A_s)
         D = spzeros(n)
@@ -26,8 +26,8 @@ function exp1(inputFile, optimalValue, label; linesearch=false, ε=1e-2, v0=noth
             end
         end
         lower = 0
-        upper = sum(D)
-    else
+        upper = sqrt(2 * sum(D))
+    elseif mode == "opt"
         rows = rowvals(A_s)
         vals = nonzeros(A_s)
         D = spzeros(n)
@@ -36,9 +36,16 @@ function exp1(inputFile, optimalValue, label; linesearch=false, ε=1e-2, v0=noth
                 D[i] += 1
             end
         end
-        lower = opt
+        lower = 0
         upper = 2 * opt
+    elseif mode == "none"
+        D = ones(n)
+        lower = 0
+        upper = 1e16
     end
+
+    #println(maximum(upper ./ D), " ", minimum(upper ./ D), " ", mean(upper ./ D), " ", median(upper ./ D))
+
     rows = nothing
     vals = nothing
 
@@ -71,9 +78,9 @@ function exp1(inputFile, optimalValue, label; linesearch=false, ε=1e-2, v0=noth
     disp(cv.val, name="Cut Value")
     Result[colorCount, 1] = CutValue(A_s, r).val / 2
     Result[colorCount, 2] = result1.val^2 / 2
-    global colorCount = colorCount + 1
     A_s = nothing
     return (v=result1.v, t=result1.t, z=result1.z)
+
 end
 
 ε1 = 10^(-2)
@@ -95,10 +102,15 @@ for row in csv_reader
     if index in idx
         opt = row.opt
         result = exp1("Gset/g" * index * ".txt", -opt,
-            "G" * index, ε=ε1, linesearch=false)
+            "G" * index * "new", ε=ε1, linesearch=false, mode="new")
 
         result = exp1("Gset/g" * index * ".txt", -opt,
-            "G" * index * "new", ε=ε1, linesearch=false, new=true)
+            "G" * index * "opt", ε=ε1, linesearch=false, mode="opt")
+
+        result = exp1("Gset/g" * index * ".txt", -opt,
+            "G" * index * "non", ε=ε1, linesearch=false, mode="none")
+
+        global colorCount = colorCount + 1
     end
 end
 

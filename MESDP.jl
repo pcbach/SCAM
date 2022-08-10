@@ -233,13 +233,13 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
             bestRes = 0
             bestIdx = 0
             for i in 1:numSample
-                cut = CutValue(A, z[i, :])
+                cut = CutValue(A, z[i, :]).val
                 if cut > bestRes
                     bestRes = cut
                     bestIdx = i
                 end
             end
-            cutValue = CutValue(A, z[bestIdx, :]) / 2
+            cutValue = CutValue(A, z[bestIdx, :]).val / 2
             println(t, ": ", round.(abs(f(A, v)); digits=3), " ", round.(log10(abs(gap)); digits=3), " ", cutValue)
             εd0 = εd0 - 0.1
         elseif (t % 10 == 0)
@@ -250,7 +250,7 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
         bestRes = 0
         bestIdx = 0
         for i in 1:numSample
-            cut = CutValue(A, z[i, :])
+            cut = CutValue(A, z[i, :]).val
             if cut > bestRes
                 bestRes = cut
                 bestIdx = i
@@ -264,14 +264,14 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
             #append!(mingrad, minimum(grad))
             #append!(maxgrad, maximum(grad))
         end
-        cutValue = Int64(CutValue(A, z[bestIdx, :]) / 2)
+        cutValue = Int64(CutValue(A, z[bestIdx, :]).val / 2)
         result = (val=f(A, v), v=v, t=t, plot=(x=xlog, y=ylog), time=timelog, gamma=gammalog, mingrad=mingrad, maxgrad=maxgrad, z=z[bestIdx, :])
         return result
     else
         bestRes = 0
         bestIdx = 0
         for i in 1:numSample
-            cut = CutValue(A, z[i, :])
+            cut = CutValue(A, z[i, :]).val
             if cut > bestRes
                 bestRes = cut
                 bestIdx = i
