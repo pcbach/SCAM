@@ -42,7 +42,7 @@ function grad(A; P=nothing, v=nothing)
     return r
 end
 
-function B(A; P=nothing, v=nothing)
+function B(A; P=nothing, v=nothing, identity=nothing)
     rows = rowvals(A)
     vals = nonzeros(A)
     r = spzeros(n)
@@ -53,7 +53,12 @@ function B(A; P=nothing, v=nothing)
     end
 
     for i in 1:n
-        if P !== nothing
+        if identity !== nothing
+            for k in nzrange(A, i)
+                r[i] += vals[k]^2
+            end
+            r[i] = r[i] * identity
+        elseif P !== nothing
             a = A[:, i]
             r[i] = a' * P' * a
         elseif v !== nothing
@@ -171,7 +176,7 @@ function CutValue(A, z)
     end
     #disp(r)
     #disp(r' * A' * A * r / 2)
-    return r' * A' * A * r
+    return (cut=r, val=r' * A' * A * r)
 
 end
 
