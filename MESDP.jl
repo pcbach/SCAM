@@ -19,7 +19,7 @@ function disp(quan; name="")
     if name != ""
         print(name, ":\n")
     end
-    display(quan)
+    display(round.(quan, digits=2))
     #print("\n____________________________")
     print("\n")
 end
@@ -112,28 +112,39 @@ function LMOtrueGrad(A, v; lowerBound=0, upperBound=1e16)
         grad_ = clamp(grad_, lowerBound, upperBound)
         ∇P = ∇P - a * a' * grad_
     end
-    (eig, eigv) = eigen(∇P)
+    (eig, eigv) = eigen(Matrix(∇P))
     w = eigv[:, 1]
     w = w / norm(w)
     q = B(A, v=w)
-    return w, q, eig[1]
+    return w, q, eig[1], ∇P
 end
 
 #Frank Wolfe with true gradient
-function solvesampTrue(A, v0; t0=2, ε=1e-3, lowerBound=0, upperBound=1e16)
+function solvesampTrue(A, P0, v0; t0=2, ε=1e-3, lowerBound=0, upperBound=1e16)
+    P = P0
     v = v0
     t = 0
     start = t0
     gamma = 2 / (t + start)
-    w, q, λ = LMOtrueGrad(A, v, lowerBound=lowerBound, upperBound=upperBound)
+    w, q, λ, G = LMOtrueGrad(A, v, lowerBound=lowerBound, upperBound=upperBound)
+    #println(dot(q - v, ∇g(v, lowerBound=lowerBound, upperBound=upperBound)) / abs(f(A, v)))
+    track = zeros(0)
     while dot(q - v, ∇g(v, lowerBound=lowerBound, upperBound=upperBound)) / abs(f(A, v)) > ε
+
+        R = A' * P * A
+        X = diagm(diag(R))^(-1 / 2) * R * diagm(diag(R))^(-1 / 2)
+        A_ = A[1:m1, :]
+        C = A_' * A_
+        append!(track, tr(C * X))
         t = t + 1
         v = (1 - gamma) * v + gamma * q
+        P = (1 - gamma) * P + gamma * w * w'
         gamma = 2 / (t + start)
-        w, q, λ = LMOtrueGrad(A, v, lowerBound=lowerBound, upperBound=upperBound)
+        w, q, λ, G = LMOtrueGrad(A, v, lowerBound=lowerBound, upperBound=upperBound)
+        #println(dot(q - v, ∇g(v, lowerBound=lowerBound, upperBound=upperBound)) / abs(f(A, v)))
 
     end
-    result = (val=f(A, v), t=t)
+    result = (val=f(A, v), t=t, P=P, plot=track)
     return result
 end
 
@@ -176,14 +187,134 @@ function CutValue(A, z)
     end
     #disp(r)
     #disp(r' * A' * A * r / 2)
-    return (cut=r, val=r' * A' * A * r)
+    A_cut = A[1:m, 1:n]
+    return (cut=r, val=r' * A_cut' * A_cut * r)
 
 end
 
-function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e16, printIter=false, plot=false, linesearch=false, numSample=1)
+function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e16, printIter=false, plot=false, linesearch=false, numSample=1, timer=to)
     v = v0
     t = t0
-    z = rand(Normal(0, sqrt(1 / m)), (numSample, m))
+    z = rand(Normal(0, sqrt(1 / (m))), (numSample, (m)))
+    start = t0
+    if !linesearch
+        gamma = 2 / (t + start)
+    end
+    if plot
+        xlog = zeros(0)
+        ylog = zeros(0)
+        timelog = zeros(0)
+        gammalog = zeros(0)
+        mingrad = zeros(0)
+        maxgrad = zeros(0)
+    end
+    w, q, λ = ArnoldiGrad(A, v, lowerBound=lowerBound, upperBound=upperBound, D=D, tol=ε)
+    gap = dot(q - v, ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)) / abs(f(A, v))
+    εd0 = 0
+    if plot
+        append!(ylog, abs(f(A, v)))
+    end
+    while gap > ε
+        @timeit timer "inner iteration" begin
+            if plot
+                append!(ylog, abs(f(A, v)))
+                #append!(timelog, time())
+                #append!(gammalog, gammaLineSearch(A, v, q))
+                #grad = ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)
+                #append!(mingrad, minimum(grad))
+                #append!(maxgrad, maximum(grad))
+            end
+            t = t + 1
+
+            #disp(gammaLineSearch(v, q))
+            if linesearch
+                gamma = gammaLineSearch(A, v, q)
+            end
+            v = (1 - gamma) * v + gamma * q
+            for i in 1:numSample
+                z[i, :] = sqrt(1 - gamma) * z[i, :] + sqrt(gamma) * w * rand(Normal(0, 1))
+            end
+
+            if !linesearch
+                gamma = 2 / (t + start)
+            end
+            @timeit timer "eigensolve" begin
+                w, q, λ = ArnoldiGrad(A, v, lowerBound=lowerBound, upperBound=upperBound, D=D, tol=ε)
+            end
+            gap = dot(q - v, ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)) / abs(f(A, v))
+            if gap < 10.0^(εd0)
+                bestRes = 0
+                bestIdx = 0
+                for i in 1:numSample
+                    cut = CutValue(A, z[i, :]).val
+                    if cut > bestRes
+                        bestRes = cut
+                        bestIdx = i
+                    end
+                end
+                cutValue = CutValue(A, z[bestIdx, :]).val
+                println(t, ": ", round.(abs(f(A, v)); digits=3), " ", round.(log10(abs(gap)); digits=3), " ", cutValue)
+                εd0 = εd0 - 1
+            elseif (t % 10 == 0)
+                print('-')
+            end
+        end
+    end
+    @timeit timer "return" begin
+
+        if plot
+            bestRes = 0
+            bestIdx = 0
+            for i in 1:numSample
+                cut = CutValue(A, z[i, :]).val
+                if cut > bestRes
+                    bestRes = cut
+                    bestIdx = i
+                end
+            end
+            if plot
+                append!(ylog, abs(f(A, v)))
+                #append!(timelog, time())
+                #append!(gammalog, gammaLineSearch(A, v, q))
+                #grad = ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)
+                #append!(mingrad, minimum(grad))
+                #append!(maxgrad, maximum(grad))
+            end
+            cutValue = Int64(CutValue(A, z[bestIdx, :]).val / 2)
+            result = (val=f(A, v), v=v, t=t, plot=(x=xlog, y=ylog), time=timelog, gamma=gammalog, mingrad=mingrad, maxgrad=maxgrad, z=z[bestIdx, :])
+            return result
+        else
+            bestRes = 0
+            bestIdx = 0
+            for i in 1:numSample
+                cut = CutValue(A, z[i, :]).val
+                if cut > bestRes
+                    bestRes = cut
+                    bestIdx = i
+                end
+            end
+            result = (val=f(A, v), v=v, t=t, z=z[bestIdx, :])
+            return result
+        end
+    end
+end
+
+
+function SolveSketch(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e16, printIter=false, plot=false, linesearch=false)
+    v = v0
+    t = t0
+    #z = rand(Normal(0, sqrt(1 / (m))), (numSample, (m)))
+
+    #sketch initialization
+    r = 1
+    k = 2 * r + 1#2 * r + 1
+    l = 4 * r + 3#4 * r + 3
+    Ω = rand(m, k)
+    Ψ = rand(l, m)
+    Y = Ω
+    W = Ψ
+    #
+
     start = t0
     if !linesearch
         gamma = 2 / (t + start)
@@ -219,65 +350,39 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
             gamma = gammaLineSearch(A, v, q)
         end
         v = (1 - gamma) * v + gamma * q
-
-        for i in 1:numSample
-            z[i, :] = sqrt(1 - gamma) * z[i, :] + sqrt(gamma) * w * rand(Normal(0, 1))
-        end
+        #update sketch
+        Y = (1 - gamma) * Y + gamma * w * (w' * Ω)
+        W = (1 - gamma) * W + gamma * (Ψ * w) * w'
+        #
 
         if !linesearch
             gamma = 2 / (t + start)
         end
         w, q, λ = ArnoldiGrad(A, v, lowerBound=lowerBound, upperBound=upperBound, D=D, tol=ε)
         gap = dot(q - v, ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)) / abs(f(A, v))
-        if gap < 10^(εd0)
-            bestRes = 0
-            bestIdx = 0
-            for i in 1:numSample
-                cut = CutValue(A, z[i, :]).val
-                if cut > bestRes
-                    bestRes = cut
-                    bestIdx = i
-                end
-            end
-            cutValue = CutValue(A, z[bestIdx, :]).val / 2
-            println(t, ": ", round.(abs(f(A, v)); digits=3), " ", round.(log10(abs(gap)); digits=3), " ", cutValue)
-            εd0 = εd0 - 0.1
-        elseif (t % 10 == 0)
-            print('-')
-        end
+        println(t, ": ", round.(abs(f(A, v)); digits=3), " ", round.(log10(abs(gap)); digits=3))
     end
     if plot
-        bestRes = 0
-        bestIdx = 0
-        for i in 1:numSample
-            cut = CutValue(A, z[i, :]).val
-            if cut > bestRes
-                bestRes = cut
-                bestIdx = i
-            end
-        end
-        if plot
-            append!(ylog, abs(f(A, v)))
-            #append!(timelog, time())
-            #append!(gammalog, gammaLineSearch(A, v, q))
-            #grad = ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)
-            #append!(mingrad, minimum(grad))
-            #append!(maxgrad, maximum(grad))
-        end
-        cutValue = Int64(CutValue(A, z[bestIdx, :]).val / 2)
-        result = (val=f(A, v), v=v, t=t, plot=(x=xlog, y=ylog), time=timelog, gamma=gammalog, mingrad=mingrad, maxgrad=maxgrad, z=z[bestIdx, :])
+
+        Q = qr(Y).Q
+        B_ = pinv(Ψ * Q) * W
+        U, S, V = svds(B_, nsv=r)[1]
+        X_ = Q * U * diagm(S) * V'
+        #disp(Q)
+        eval, evec = eigen(X_)
+        #disp(round.(evec, digits=2))
+        # disp(round.(eval, digits=2))
+        s = argmax(abs.(eval))
+        z = (evec[:, s] * sqrt(eval[s]))
+        disp(z)
+        z = sign.(A' * z)
+        disp(z' * A' * A * z)
+        #z = evec[:, 1]
+        #disp(CutValue(A, z))
+        result = (val=f(A, v), v=v, t=t, plot=(x=xlog, y=ylog), time=timelog, gamma=gammalog, mingrad=mingrad, maxgrad=maxgrad)
         return result
     else
-        bestRes = 0
-        bestIdx = 0
-        for i in 1:numSample
-            cut = CutValue(A, z[i, :]).val
-            if cut > bestRes
-                bestRes = cut
-                bestIdx = i
-            end
-        end
-        result = (val=f(A, v), v=v, t=t, z=z[bestIdx, :])
+        result = (val=f(A, v), v=v, t=t)
         return result
     end
 

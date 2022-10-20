@@ -2,8 +2,8 @@ include("MESDP.jl")
 include("ReadGSet.jl")
 using Plots
 
-colorCount = 1
-Result = zeros((29, 2))
+colorCount = 0
+Result = zeros((29, 3))
 function exp1(inputFile, optimalValue, label; linesearch=false, ε=1e-2, v0=nothing, t0=0, mode="new")
     file = inputFile
     A = readfile(file)
@@ -56,7 +56,9 @@ function exp1(inputFile, optimalValue, label; linesearch=false, ε=1e-2, v0=noth
         v = v0
         t = t0
     end
-    result1 = Solve(A_s, v, t0=t, D=D, lowerBound=lower, upperBound=upper, printIter=true, plot=true, linesearch=linesearch, ε=ε, numSample=1)
+    disp(upper)
+    disp(lower)
+    result1 = Solve(A_s, v, t0=t, D=D, lowerBound=lower, upperBound=upper, printIter=true, plot=true, linesearch=linesearch, ε=ε, numSample=20)
     plotx = t0 - 1 .+ (1:length(result1.plot.y))
     ploty = (opt .- result1.plot.y) ./ opt
     if n == 800
@@ -70,20 +72,23 @@ function exp1(inputFile, optimalValue, label; linesearch=false, ε=1e-2, v0=noth
     end
     plot!(log10.(plotx), log10.(ploty), label=label, dpi=300, size=(1000, 1000), color=colorCount,
         lw=3, legend_font_pointsize=10, tickfontsize=20, legend_position=:bottomleft, style=style)
-
     r = result1.z
     cv = CutValue(A_s, r)
     #disp(Vector(cv.cut), name="Cut")
     disp(result1.val, name="Primal objective")
     disp(cv.val, name="Cut Value")
+    global colorCount = colorCount + 1
     Result[colorCount, 1] = CutValue(A_s, r).val / 2
     Result[colorCount, 2] = result1.val^2 / 2
+    Result[colorCount, 3] = result1.t
     A_s = nothing
+    #histogram(∇g(v))
+    disp(Result)
     return (v=result1.v, t=result1.t, z=result1.z)
 
 end
 
-ε1 = 10^(-2)
+ε1 = 1 * 10^(-2)
 pyplot();
 #=
 
@@ -95,24 +100,18 @@ savefig("Result/exp2/Gset.png")
 
 using CSV, Tables
 csv_reader = CSV.File("result.csv")
-idx = ["1", "14", "22"]
+idx = string.([collect(1:5); collect(14:17); collect(22:26); collect(35:37); collect(43:54)]);
 for row in csv_reader
     #println(row.filename, " ", row.opt)
     index = chop(row.filename, head=3, tail=0)
     if index in idx
         opt = row.opt
         result = exp1("Gset/g" * index * ".txt", -opt,
-            "G" * index * "new", ε=ε1, linesearch=false, mode="new")
-
+            "G" * index, ε=ε1, linesearch=false, mode="new")
         result = exp1("Gset/g" * index * ".txt", -opt,
-            "G" * index * "opt", ε=ε1, linesearch=false, mode="opt")
-
-        result = exp1("Gset/g" * index * ".txt", -opt,
-            "G" * index * "non", ε=ε1, linesearch=false, mode="none")
-
-        global colorCount = colorCount + 1
+            "G" * index, ε=ε1, linesearch=false, mode="new")
     end
 end
-
-savefig("Result/exp2/Gset1-14-22Cheat.png")
-#CSV.write("ResultMESDP.csv", Tables.table(Result), writeheader=false)
+disp(Result)
+savefig("Result/exp2/Gsetnew.png")
+CSV.write("ResultMESDP.csv", Tables.table(Result), writeheader=false)
