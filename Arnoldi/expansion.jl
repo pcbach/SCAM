@@ -117,26 +117,14 @@ function lanczosSubRoutine(A, v, b)
     return wp
 end
 
-function iterate(A, i, v, j, c)
-    rows = rowvals(A)
-    vals = nonzeros(A)
-    sum = 0
-    for k in nzrange(A, i)
-        sum += vals[k] * v[rows[k], j]
-    end
-    res = zeros(size(A, 1), 1)
-    for k in nzrange(A, i)
-        res[rows[k]] = c * sum * vals[k]
-    end
-    return res
-end
+
 
 """
     iterate_arnoldi!(A, arnoldi, from:to) → arnoldi
 
 Perform Arnoldi from `from` to `to`.
 """
-function iterate_arnoldi!(A, v, arnoldi::Arnoldi{T}, range::UnitRange{Int}; lowerBound, upperBound, D) where {T}
+function iterate_arnoldi!(A, v, arnoldi::Arnoldi{T}, range::UnitRange{Int}; lowerBound, upperBound, D, mode) where {T}
     V, H = arnoldi.V, arnoldi.H
     rows = rowvals(A)
     vals = nonzeros(A)
@@ -149,36 +137,52 @@ function iterate_arnoldi!(A, v, arnoldi::Arnoldi{T}, range::UnitRange{Int}; lowe
         #w_ = zeros(1, 1)
         #w__ = zeros(size(A, 1), 1)
         #w___ = zeros(size(A, 1), 1)
-        V[:, j+1] = spzeros(size(A, 1), 1)
-        for i in 1:size(A, 2)
-            #a = A[:, i]
-            c = -1 / (2 * sqrt(v[i]))
-            c = clamp(c, -upperBound / D[i], -lowerBound / D[i])
-            #mul!(w_, a', V[:, j])
-            #w_ = a' * b
-            #mul!(w__, a * c, w_)
-            #w_ = c * a * w_
-            #println(round.(w__; digits=2))
-            #V[:, j+1] += iterate(A, i, V, j, c)
-            sum = 0
-            for k in nzrange(A, i)
-                sum += vals[k] * V[rows[k], j]
+        if mode == "A"
+            V[:, j+1] = spzeros(size(A, 1), 1)
+            for i in 1:size(A, 2)
+                #a = A[:, i]
+                c = -1 / (2 * sqrt(v[i]))
+                c = clamp(c, -upperBound / D[i], -lowerBound / D[i])
+                #mul!(w_, a', V[:, j])
+                #w_ = a' * b
+                #mul!(w__, a * c, w_)
+                #w_ = c * a * w_
+                #println(round.(w__; digits=2))
+                #V[:, j+1] += iterate(A, i, V, j, c)
+                sum = 0
+                for k in nzrange(A, i)
+                    sum += vals[k] * V[rows[k], j]
+                end
+                for k in nzrange(A, i)
+                    V[rows[k], j+1] += c * sum * vals[k]
+                end
+                #wp = wp + w_
+                #w___ += w__
             end
-            for k in nzrange(A, i)
-                V[rows[k], j+1] += c * sum * vals[k]
+        elseif mode == "C"
+            V[:, j+1] = spzeros(size(A, 1), 1)
+            tmp = spzeros(size(A, 1), 1)
+            tmp2 = spzeros(size(A, 1), 1)
+            for i in 1:size(A, 2)
+                c = sqrt(1 / (2 * sqrt(v[i])))
+                c = clamp(c, lowerBound / D[i], upperBound / D[i])
+                tmp[i] = c * V[i, j]
             end
-            #wp = wp + w_
-            #w___ += w__
+            #=
+                        for i in 1:size(A, 2)
+                            sum = 0
+                            for k in nzrange(A, i)
+                                sum += vals[k] * tmp[rows[k]]
+                            end
+                            tmp2[i] = sum
+                        end=#
+            tmp2 = A * tmp
+            for i in 1:size(A, 2)
+                c = sqrt(1 / (2 * sqrt(v[i])))
+                c = clamp(c, lowerBound / D[i], upperBound / D[i])
+                V[i, j+1] = -c * tmp2[i]
+            end
         end
-        #V[:, j+1] = w
-        #println(round.(view(V, :, j); digits=2))
-        #println(round.(view(V, :, j + 1); digits=2))
-        #println("##################################################")
-        ##END MODIFICATION!!!!#################################################################
-        # Orthogonalize it against the other columns
-        # If V[:,j+1] is in the span of V[:,1:j], then we generate a new
-        # vector. If j == n, then obviously we cannot find a new orthogonal
-        # column V[:,j+1].
         if orthogonalize!(arnoldi, j) === false && j != size(V, 1)
             reinitialize!(arnoldi, j)
         end

@@ -95,15 +95,15 @@ function partialschur(A, v;
     nev::Int=min(6, size(A, 1)),
     which::Target=LM(),
     tol::Real=sqrt(eps(real(vtype(A)))),
-    mindim::Int=min(max(10, nev), size(A, 1)),
-    maxdim::Int=min(max(20, 2nev), size(A, 1)),
-    restarts::Int=200, lowerBound=0, upperBound=1e16, D=ones(1, n))
+    mindim::Int=min(max(12, nev), size(A, 1)),
+    maxdim::Int=min(max(20, 2 * nev), size(A, 1)),
+    restarts::Int=200, lowerBound=0, upperBound=1e16, D=ones(1, n), mode="A")
     #s = checksquare(A)
     if nev < 1
         throw(ArgumentError("nev cannot be less than 1"))
     end
     nev ≤ mindim ≤ maxdim || throw(ArgumentError("nev ≤ mindim ≤ maxdim does not hold, got $nev ≤ $mindim ≤ $maxdim"))
-    _partialschur(A, v, vtype(A), mindim, maxdim, nev, tol, restarts, which, lowerBound=lowerBound, upperBound=upperBound, D=D)
+    _partialschur(A, v, vtype(A), mindim, maxdim, nev, tol, restarts, which, lowerBound=lowerBound, upperBound=upperBound, D=D, mode=mode)
 end
 
 """
@@ -139,7 +139,7 @@ struct History
     nev::Int
 end
 
-function _partialschur(A, v, ::Type{T}, mindim::Int, maxdim::Int, nev::Int, tol::Ttol, restarts::Int, which::Target; lowerBound, upperBound, D) where {T,Ttol<:Real}
+function _partialschur(A, v, ::Type{T}, mindim::Int, maxdim::Int, nev::Int, tol::Ttol, restarts::Int, which::Target; lowerBound, upperBound, D, mode) where {T,Ttol<:Real}
     n = size(A, 1)
 
     # Pre-allocated Arnoldi decomp
@@ -182,12 +182,12 @@ function _partialschur(A, v, ::Type{T}, mindim::Int, maxdim::Int, nev::Int, tol:
 
     # Initialize an Arnoldi relation of size `mindim`
     reinitialize!(arnoldi)
-    iterate_arnoldi!(A, v, arnoldi, 1:mindim, lowerBound=lowerBound, upperBound=upperBound, D=D)
+    iterate_arnoldi!(A, v, arnoldi, 1:mindim, lowerBound=lowerBound, upperBound=upperBound, D=D, mode=mode)
 
     for iter = 1:restarts
 
         # Expand Krylov subspace dimension from `k` to `maxdim`.
-        iterate_arnoldi!(A, v, arnoldi, k+1:maxdim, lowerBound=lowerBound, upperBound=upperBound, D=D)
+        iterate_arnoldi!(A, v, arnoldi, k+1:maxdim, lowerBound=lowerBound, upperBound=upperBound, D=D, mode=mode)
 
         # Bookkeeping
         prods += length(k+1:maxdim)
