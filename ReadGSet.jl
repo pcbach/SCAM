@@ -11,6 +11,7 @@ function readfile(filename)
         n = maximum([n, i, j])
     end
     A = spzeros(m, n)
+    C = spzeros(n, n)
     #println(n, " ", m)
     cnt = 1
     close(file)
@@ -19,12 +20,17 @@ function readfile(filename)
         splitted = split.(ln, " ")
         i = parse(Int64, splitted[1])
         j = parse(Int64, splitted[2])
-
-        #println(cnt, " ", i, " ", j)
-        A[cnt, i] = 1
-        A[cnt, j] = -1
+        #=if (cnt % 10000 == 0)
+            println(cnt, " ", i, " ", j)
+        end=#
+        A[cnt, j] = 1
+        A[cnt, i] = -1
+        C[i, j] -= 1
+        C[j, i] -= 1
+        C[i, i] += 1
+        C[j, j] += 1
         cnt += 1
     end
-    return A
+    return A, C
 end
 #display(readfile("data.txt"))
