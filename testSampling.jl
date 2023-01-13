@@ -147,3 +147,5 @@ opt = 4006.26
 result1 = exp1(inputfile, outputfile, opt,
 "g51", ε=ε1, linesearch=false, bound=true)
 =#
+=======
+>>>>>>> 21f8ada2da1e782fff3e0acd78d224eae9789a7c
