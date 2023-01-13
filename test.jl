@@ -69,6 +69,7 @@ function exp1(inputFile, outputFile, optimalValue, label; linesearch=false, ε=1
 end
 #"C:/Users/pchib/Desktop/MASTER/MESDP/toy.txt"
 #print(m,n)
+#=
 opt = 4006.2
 ε1 = 1e-2
 ε2 = 1e-3
@@ -94,3 +95,5 @@ exp1(inputfile, outputfile, opt,
     "Schedule", ε=ε2, v0=result.v, t0=result.t - 1, linesearch=false)
 #"C:/Users/pchib/Desktop/MASTER/MESDP/Gset/g5.txt"
 #exp1("Gset/G14.txt", "Result/exp1/G14and5.png", 3191.6, "max")
+=#
+exp1("Gset/G14.txt", nothing, 3191.6, "max")
