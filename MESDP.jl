@@ -180,7 +180,7 @@ function ArnoldiGrad(A, v; lowerBound=0, upperBound=1e16, tol=1e-6, D=ones(1, n)
         tmp2 /= scale
         return u, tmp2, eig[1]
     end
-
+end
 function gammaLineSearch(v, q; ε=1e-8)
     b = 0
     e = 1
@@ -227,7 +227,7 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
         flog = zeros(0)
         glog = zeros(0)
     end
-    w, q, λ = ArnoldiGrad(A, v, lowerBound=lowerBound, upperBound=upperBound, D=D, mode=mode)
+    @time w, q, λ = ArnoldiGrad(A, v, lowerBound=lowerBound, upperBound=upperBound, D=D, mode=mode)
     gap = dot(q - v, ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)) / abs(f(v))
     εd0 = 0
     while gap > ε
@@ -262,7 +262,7 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
         gap = dot(q - v, ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)) / abs(f(v))
         println(t, " ", abs(f(v)), " ", gap)
         #=if gap < 10^(εd0)
-            println(t, ": ", abs(f(A, v)), " ", gap)
+            println(t, ": ", abs(f(v)), " ", gap)
             εd0 = εd0 - 0.1
         else
             print('-')
@@ -275,7 +275,7 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
         bestRes = 0
         bestIdx = 0
         for i in 1:numSample
-            cut = CutValue(A, z[i, :])
+            cut = CutValue(A, z[i, :]).val
             if cut > bestRes
                 bestRes = cut
                 bestIdx = i
@@ -287,7 +287,7 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
         bestRes = 0
         bestIdx = 0
         for i in 1:numSample
-            cut = CutValue(A, z[i, :])
+            cut = CutValue(A, z[i, :]).val
             if cut > bestRes
                 bestRes = cut
                 bestIdx = i
