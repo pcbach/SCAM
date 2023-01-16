@@ -15,13 +15,11 @@ using SparseArrays
 #==============================MISC=============================#
 #Julia Display with endline
 function disp(quan; name="")
-    #print("____________________________\n")
     if name != ""
         print(name, ":\n")
     end
     display(quan)
-    #print("\n____________________________")
-    print("\n")
+    print('\n')
 end
 
 #==========================BASIC=ALGORITHM======================#
@@ -41,7 +39,6 @@ function grad(A; P=nothing, v=nothing)
     end
     return r
 end
-
 
 function B(A; P=nothing, v=nothing, d=nothing)
     rows = rowvals(A)
@@ -151,26 +148,15 @@ function ArnoldiGrad(A, v; lowerBound=0, upperBound=1e16, tol=1e-6, D=ones(1, n)
         tmp = zeros(n, 1)
         tmp2 = zeros(n, 1)
         for i = 1:n
-            c = sqrt(1 / (2 * sqrt(v[i])))
+            c = 1 / (2 * sqrt(v[i]))
             c = clamp(c, lowerBound / D[i], upperBound / D[i])
-            tmp[i] = c * u[i]
+            tmp[i] = sqrt(c) * u[i]
         end
-        #=rows = rowvals(A)
-        vals = nonzeros(A)
-        scale = 0
-        for i in 1:size(A, 2)
-            sum = 0
-            for k in nzrange(A, i)
-                sum += vals[k] * tmp[rows[k]]
-            end
-            tmp2[i] = sum
-
-        end=#
         tmp2 = A * tmp
         for i = 1:n
-            c = sqrt(1 / (2 * sqrt(v[i])))
+            c = 1 / (2 * sqrt(v[i]))
             c = clamp(c, lowerBound / D[i], upperBound / D[i])
-            tmp[i] = c * tmp2[i]
+            tmp[i] = sqrt(c) * tmp2[i]
         end
         scale = 0
         for i = 1:n
@@ -185,10 +171,14 @@ function gammaLineSearch(v, q; ε=1e-8)
     b = 0
     e = 1
     while e - b > ε
+        #println(b, " ", e)
+        # Find the mid1 and mid2
         mid1 = b + (e - b) / 3
         mid2 = e - (e - b) / 3
         vmid1 = (1 - mid1) * v + mid1 * q
         vmid2 = (1 - mid2) * v + mid2 * q
+        #disp(vmid1)
+        #disp(vmid2)
         if f(vmid1) < f(vmid2)
             b = mid1
         else
@@ -209,9 +199,8 @@ function CutValue(A, z)
         end
         r[i] = sign(r[i])
     end
-    #disp(r)
     #disp(r' * A' * A * r / 2)
-    return (cut=r, val=r' * A' * A * r)
+    return r' * A' * A * r / 2
 
 end
 
@@ -230,6 +219,8 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
     @time w, q, λ = ArnoldiGrad(A, v, lowerBound=lowerBound, upperBound=upperBound, D=D, mode=mode)
     gap = dot(q - v, ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)) / abs(f(v))
     εd0 = 0
+    #proj = rand(2, size(v)[1]) .- 0.5
+    #println(t, ": ", abs(f(A, v)), " ", gap)
     while gap > ε
         if plot
             append!(flog, abs(f(v)))

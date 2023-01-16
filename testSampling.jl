@@ -141,10 +141,10 @@ savefig(outputfile)
 =#
 
 
-inputfile = ["100kn3d.txt", "100kn3d2.txt", "100kn10d.txt", "100kn10d2.txt", "300kn3d.txt", "300kn3d2.txt", "300kn5d.txt", "300kn5d.txt", "1mn3d.txt", "1mn3d2.txt", "1mn4d.txt", "1mn4d2.txt"]
+inputfile = ["300kn3d.txt", "300kn3d2.txt", "300kn5d.txt", "300kn5d.txt", "1mn3d.txt", "1mn3d2.txt", "1mn4d.txt", "1mn4d2.txt"]
 
 for i in 1:length(inputfile)
     name = inputfile[i]
     file = "BigExample/" * name
-    exp1(file, name, ε=10^(-2), linesearch=true, bound=true, mode="A")
+    exp1(file, name, ε=10^(-2), linesearch=true, bound=true, mode="C")
 end
