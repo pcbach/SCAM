@@ -8,7 +8,8 @@ using BenchmarkTools
 #Single graph with individual bound on the gradient
 function exp1(inputFile, outputfile; linesearch=false, ε=1e-2, v0=nothing, t0=0, bound=true, mode="A", startεd0=0.0)
     file = inputFile
-    A, C = readfile(file)
+    disp(file, name="file")
+    @time A, C = readfile(file)
     #disp(size(A))
     A = A / 2
     C = C / 4
@@ -106,10 +107,10 @@ for i in 1:cnt
 end
 #=
 for i in 1:cnt
-    inputfile = "C:/Users/pchib/Desktop/MASTER/MESDP/Gset/g" * string(num[i]) * ".txt"
+    inputfile = "Gset/g" * string(num[i]) * ".txt"
     #inputfile = "C:/Users/pchib/Desktop/MASTER/MESDP/Gset/g3k" * string(num[i]) * ".txt"
     opt = optval[i]
-    #print(string(num[i]) * ": ")
+    print(string(num[i]) * ": ")
     if i in labeli
         global colorcnt = colorcnt + 1
         idx = findall(x -> x == i, labeli)

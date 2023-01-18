@@ -252,7 +252,7 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
         bestRes = 0
         bestIdx = 0
         for i in 1:numSample
-            cut = CutValue(A, z[i, :])
+            cut = CutValue(A, z[i, :]).val
             if cut > bestRes
                 bestRes = cut
                 bestIdx = i
@@ -264,7 +264,7 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
         bestRes = 0
         bestIdx = 0
         for i in 1:numSample
-            cut = CutValue(A, z[i, :])
+            cut = CutValue(A, z[i, :]).val
             if cut > bestRes
                 bestRes = cut
                 bestIdx = i
