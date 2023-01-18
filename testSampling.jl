@@ -3,94 +3,79 @@ include("ReadGSet.jl")
 using LaTeXStrings
 using Plots
 using Plots.PlotMeasures
+using BenchmarkTools
+
 #Single graph with individual bound on the gradient
-function exp1(inputFile, outputFile, optimalValue, label; linesearch=false, ε=1e-2, v0=nothing, t0=0, bound=true, color=black, mode="A")
+function exp1(inputFile, outputfile; linesearch=false, ε=1e-2, v0=nothing, t0=0, bound=true, mode="A", startεd0=0.0)
     file = inputFile
     A, C = readfile(file)
     #disp(size(A))
     A = A / 2
     C = C / 4
-    #disp(norm(C - A' * A), name="norm")
     global m = size(A, 1)
     global n = size(A, 2)
-    #=D = diagm(0 * ones(n))
-    A = vcat(A, D)
-    global m = size(A, 1)
-    global n = size(A, 2)
-    =#
-    A_s = sparse(A)
-    A = nothing
 
-    rows = rowvals(A_s)
-    vals = nonzeros(A_s)
     D = spzeros(n)
-    D_ = spzeros(n)
     sumai = 0
     for i in 1:n
-        s = 0
-        for k in nzrange(A_s, i)#
-            s += abs(vals[k])^2
-            D_[i] += 1
-        end
-        sumai += 2 * s
-        D[i] = 2 * s
-        #disp(norm(A_s[:, i]))
+        D[i] = 2 * C[i, i]
+        sumai = sumai + D[i]
     end
-    #disp(D)
+    disp(sumai)
     sumai = sqrt(sumai)
-    #disp(sum(D))
-    #disp(minimum(D))
-    rows = nothing
-    vals = nothing
-    v = B(A_s, d=1 / m)
-    #print(f(A_s, v), " ", n, " ", m, " ")
+    v = B(A, d=1 / m)
 
     t = 5
-    opt = sqrt(optimalValue * 2)
     if v0 !== nothing
         v = v0
         t = t0
     end
+
     if bound
         upper = sumai
     else
         D = ones(n)
         upper = 1e16
     end
+
     if mode == "A"
-        result1 = Solve(A_s, v, t0=t, D=D, lowerBound=0, upperBound=upper, printIter=true, plot=true, linesearch=linesearch, ε=ε, numSample=1, mode=mode)
+        result1 = Solve(A_s, v, t0=t, D=D, lowerBound=0, upperBound=upper, plot=true, linesearch=linesearch, ε=ε, numSample=1, mode=mode, logfilename=outputfile, startεd0=startεd0)
     elseif mode == "C"
-        result1 = Solve(C, v, t0=t, D=D, lowerBound=0, upperBound=upper, printIter=true, plot=true, linesearch=linesearch, ε=ε, numSample=1, mode=mode)
+        result1 = Solve(C, v, t0=t, D=D, lowerBound=0, upperBound=upper, plot=true, linesearch=linesearch, ε=ε, numSample=1, mode=mode, logfilename=outputfile, startεd0=startεd0)
     end
 
-    style = :solid
-    #disp(log10.((opt .- result1.plot) ./ opt))
-
-    plot!(log10.(t0 - 1 .+ (1:length(result1.plot))), log10.(result1.gap), ratio=:equal, label=label, dpi=600, size=(150, 150),
-        lw=0.5, lc=color, gridalpha=0.5, ls=style, legend_font_pointsize=4, tickfontsize=5, legend_position=:bottomleft, xlabel=L"\ln(k)", ylabel=L"\ln(RFWgap)", yguidefontsize=5, xguidefontsize=5, left_margin=-0.5mm, bottom_margin=-0.5mm, ytick=collect(-5:1:5), xtick=collect(-5:1:5))
-
-    #=open("C:/Users/pchib/Desktop/MASTER/MESDP/Result/Log/exp5/" * chop(inputFile, head=41, tail=4) * "log.txt", "w") do io
-        println(io, Int64(length(result1.gap)))
-        for i in 1:length(result1.gap)
-            println(io, result1.gap[i])
-        end
-    end=#
-    #if outputFile !== nothing
-    #    savefig(outputFile)
-    #end
-    r = result1.z
-    disp(result1.val^2 / 2)
-    disp(result1.t)
     return (v=result1.v, t=result1.t, z=result1.z)
 end
 
-#=opt = 12083.2
-ε1 = 10^(-3.5)
+#=
+opt = 12083.2
+ε1 = 10^(-1.5)
 inputfile = "C:/Users/pchib/Desktop/MASTER/MESDP/Gset/g1.txt"
-@time exp1(inputfile, nothing, opt, nothing, ε=ε1, linesearch=true, bound=true, color=:black, mode="A")
-@time exp1(inputfile, "C:/Users/pchib/Desktop/MASTER/MESDP/Result/exp1/test.png", opt, nothing, ε=ε1, linesearch=true, bound=true, color=:black, mode="C")
+#disp(@benchmark exp1(inputfile, nothing, opt, nothing, ε=ε1, linesearch=true, bound=true, color=:black, mode="A"))
+u = @benchmark exp1(inputfile, nothing, opt, nothing, ε=ε1, linesearch=true, bound=true, color=:black, mode="C")
+println(mean(u).memory)
+println(mean(u).time)
 =#
-ε1 = 10^(-2.5)
+#=
+ε1 = 10^(-2)
+inputfile = "Gset/G49.txt"
+=#
+#=
+outputfile = "MATLABplot/G48log-0.txt"
+exp1(inputfile, outputfile, ε=ε1, linesearch=true, bound=true, mode="C", startεd0=0.0)
+
+
+outputfile = "MATLABplot/G48log-1.txt"
+exp1(inputfile, outputfile, ε=ε1, linesearch=true, bound=true, mode="C", startεd0=-1.0)
+
+
+outputfile = "MATLABplot/G48log-2.txt"
+exp1(inputfile, outputfile, ε=ε1, linesearch=true, bound=true, mode="C", startεd0=-2.0)
+=#
+#=
+outputfile = "MATLABplot/G49log-3.txt"
+exp1(inputfile, outputfile, ε=ε1, linesearch=true, bound=true, mode="C", startεd0=-3.0)
+=#
 num = [1, 2, 3, 4, 5,
     14, 15, 16, 17, 22,
     23, 24, 25, 26, 35,
@@ -111,10 +96,15 @@ optval = [12083.2, 12089.43, 12084.33, 12111.45, 12099.89,
     0.035, 0.034, 0.043, 0.039]
 label = ["Group1", "Group2", "Group3", "Group4", "Group5", "Group6", "Group7"];
 labeli = [1, 6, 10, 15, 18, 23, 26];
-outputfile = "C:/Users/pchib/Desktop/MASTER/MESDP/Result/exp1/test.png"
-colors = [:pink, :red, :yellow, :orange, :blue, :black, :cyan]
 global colorcnt = 0
 cnt = 29
+ε1 = 10^(-2.5);
+for i in 1:cnt
+    inputfile = "Gset/g" * string(num[i]) * ".txt"
+    outputfile = "Result/exp7/G" * string(num[i]) * "log.txt"
+    exp1(inputfile, outputfile, ε=ε1, linesearch=true, bound=true, mode="C", startεd0=0.0)
+end
+#=
 for i in 1:cnt
     inputfile = "C:/Users/pchib/Desktop/MASTER/MESDP/Gset/g" * string(num[i]) * ".txt"
     #inputfile = "C:/Users/pchib/Desktop/MASTER/MESDP/Gset/g3k" * string(num[i]) * ".txt"
@@ -124,17 +114,20 @@ for i in 1:cnt
         global colorcnt = colorcnt + 1
         idx = findall(x -> x == i, labeli)
         lbl = label[idx]
-        result1 = exp1(inputfile, nothing, opt,
+        u = @benchmark exp1(inputfile, nothing, opt,
             lbl[1], ε=ε[i] / sqrt(2), linesearch=true, bound=true, color=colors[colorcnt], mode="C")
+        println(mean(u).memory, " \n", mean(u).time)
+        println()
     else
         lbl = nothing
-        result1 = exp1(inputfile, nothing, opt,
+        u = @benchmark exp1(inputfile, nothing, opt,
             nothing, ε=ε[i] / sqrt(2), linesearch=true, bound=true, color=colors[colorcnt], mode="C")
+        println(mean(u).memory, " \n", mean(u).time)
     end
 
 end
-
-savefig(outputfile)
+=#
+#
 
 #=
 inputfile = "C:/Users/pchib/Desktop/MASTER/MESDP/Gset/g22.txt"
@@ -147,5 +140,3 @@ opt = 4006.26
 result1 = exp1(inputfile, outputfile, opt,
 "g51", ε=ε1, linesearch=false, bound=true)
 =#
-=======
->>>>>>> 21f8ada2da1e782fff3e0acd78d224eae9789a7c

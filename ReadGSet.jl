@@ -20,9 +20,9 @@ function readfile(filename)
         splitted = split.(ln, " ")
         i = parse(Int64, splitted[1])
         j = parse(Int64, splitted[2])
-        #=if (cnt % 10000 == 0)
-            println(cnt, " ", i, " ", j)
-        end=#
+        if (cnt % 10000 == 0)
+            println(cnt)
+        end
         A[cnt, j] = 1
         A[cnt, i] = -1
         C[i, j] -= 1

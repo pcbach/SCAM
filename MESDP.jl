@@ -1,15 +1,9 @@
-#include("./Arnoldi/ArnoldiMethod.jl-master/src/ArnoldiMethodMod.jl")
+
 include("Arnoldi/ArnoldiMethodMod.jl")
 using .ArnoldiMethodMod
 using LinearAlgebra
 using Distributions
-#using Plots
-#using BenchmarkTools
 using Statistics
-#using Arpack
-#using DelimitedFiles, CSV, Tables
-#using DataStructures
-#using Measures
 using SparseArrays
 
 #==============================MISC=============================#
@@ -40,6 +34,7 @@ function grad(A; P=nothing, v=nothing)
     return r
 end
 
+#Linear map
 function B(A; P=nothing, v=nothing, d=nothing)
     rows = rowvals(A)
     vals = nonzeros(A)
@@ -130,56 +125,38 @@ function solvesampTrue(A, v0; t0=2, ε=1e-3, lowerBound=0, upperBound=1e16)
         w, q, λ = LMOtrueGrad(A, v, lowerBound=lowerBound, upperBound=upperBound)
 
     end
-    result = (val=f(A, v), t=t)
+    result = (val=f(A), t=t)
     return result
 end
 
-function ArnoldiGrad(A, v; lowerBound=0, upperBound=1e16, tol=1e-6, D=ones(1, n), mode="A")
+#LMO
+function ArnoldiGrad(A, v; lowerBound=0, upperBound=1e16, tol=1e-2, D=ones(1, n), mode="A")
+    Mn = lowerBound ./ D
+    Mx = upperBound ./ D
+    λ = sqrt.(clamp.(1 ./ (2 .* sqrt.(v)), Mn, Mx))
     if mode == "A"
-        decomp, history = partialschur(A, v, tol=tol, which=LM(), lowerBound=lowerBound, upperBound=upperBound, D=D, mode=mode)
+        decomp, history = partialschur(A, λ, tol=tol, which=LM(), mode=mode)
         eig, eigv = partialeigen(decomp)
         w = eigv[:, 1]
         q = B(A, v=w)
         return w, q, eig[1]
     elseif mode == "C"
-        decomp, history = partialschur(A, v, tol=tol, which=LM(), lowerBound=lowerBound, upperBound=upperBound, D=D, mode=mode)
+        decomp, history = partialschur(A, λ, tol=tol, which=LM(), mode=mode)
         eig, eigv = partialeigen(decomp)
         u = real(eigv[:, 1])
         tmp = zeros(n, 1)
         tmp2 = zeros(n, 1)
-        for i = 1:n
-            c = sqrt(1 / (2 * sqrt(v[i])))
-            c = clamp(c, lowerBound / D[i], upperBound / D[i])
-            tmp[i] = c * u[i]
-        end
-        #=rows = rowvals(A)
-        vals = nonzeros(A)
-        scale = 0
-        for i in 1:size(A, 2)
-            sum = 0
-            for k in nzrange(A, i)
-                sum += vals[k] * tmp[rows[k]]
-            end
-            tmp2[i] = sum
-
-        end=#
+        tmp = λ .* u
         tmp2 = A * tmp
-        for i = 1:n
-            c = sqrt(1 / (2 * sqrt(v[i])))
-            c = clamp(c, lowerBound / D[i], upperBound / D[i])
-            tmp[i] = c * tmp2[i]
-        end
-        scale = 0
-        for i = 1:n
-            scale += tmp[i] * u[i]
-        end
+        tmp = λ .* tmp2
+        scale = (tmp'*u)[1]
         tmp2 = tmp2 .^ 2
         tmp2 /= scale
         return u, tmp2, eig[1]
     end
 end
 
-
+#linesearch 
 function gammaLineSearch(v, q; ε=1e-8)
     b = 0
     e = 1
@@ -217,7 +194,12 @@ function CutValue(A, z)
 
 end
 
-function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e16, printIter=false, plot=false, linesearch=false, numSample=1, mode="A")
+function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e16, plot=false, linesearch=false, numSample=1, mode="A", logfilename=nothing, startεd0=-3.0)
+    if logfilename !== nothing
+        open(logfilename, "w") do io
+            print()
+        end
+    end
     v = v0
     t = t0
     z = rand(Normal(0, 1 / m), (numSample, m))
@@ -229,49 +211,40 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
         flog = zeros(0)
         glog = zeros(0)
     end
-    w, q, λ = ArnoldiGrad(A, v, lowerBound=lowerBound, upperBound=upperBound, D=D, mode=mode)
+    εd0 = startεd0
+    w, q, λ = ArnoldiGrad(A, v, lowerBound=lowerBound, upperBound=upperBound, D=D, mode=mode, tol=10^(εd0))
     gap = dot(q - v, ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)) / abs(f(v))
-    εd0 = 0
-    #proj = rand(2, size(v)[1]) .- 0.5
-    #println(t, ": ", abs(f(A, v)), " ", gap)
     while gap > ε
         if plot
             append!(flog, abs(f(v)))
             append!(glog, gap)
-            #append!(timelog, time())
-            #append!(gammalog, gammaLineSearch(A, v, q))
-            #grad = ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)
-            #append!(mingrad, minimum(grad))
-            #append!(maxgrad, maximum(grad))
         end
 
-        #disp(gammaLineSearch(v, q))
-        if linesearch && t > 20
+        if linesearch && t > 10
             gamma = gammaLineSearch(v, q)
-        elseif linesearch
+        else
             gamma = 2 / (t + start)
         end
         t = t + 1
         v = (1 - gamma) * v + gamma * q
 
-        #=for i in 1:numSample
-            z[i, :] = sqrt(1 - gamma) * z[i, :] + sqrt(gamma) * w * rand(Normal(0, 1))
-        end
-        =#
         if !linesearch
             gamma = 2 / (t + start)
         end
-        w, q, λ = ArnoldiGrad(A, v, lowerBound=lowerBound, upperBound=upperBound, D=D, mode=mode)
-        #disp(q)
+        w, q, λ = ArnoldiGrad(A, v, lowerBound=lowerBound, upperBound=upperBound, D=D, mode=mode, tol=10^(εd0))
         gap = dot(q - v, ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)) / abs(f(v))
         println(t, " ", abs(f(v)), " ", gap)
-        #=if gap < 10^(εd0)
-            println(t, ": ", abs(f(A, v)), " ", gap)
-            εd0 = εd0 - 0.1
-        else
-            print('-')
+        if logfilename !== nothing
+            open(logfilename, "a") do io
+                println(io, gap)
+            end
         end
-        =#
+
+        if gap < 10^(εd0)
+            εd0 -= 1
+            println("Change accuracy to ", 10^(εd0))
+        end
+
     end
     if plot
         append!(flog, abs(f(v)))

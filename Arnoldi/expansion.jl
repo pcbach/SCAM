@@ -124,7 +124,7 @@ end
 
 Perform Arnoldi from `from` to `to`.
 """
-function iterate_arnoldi!(A, v, arnoldi::Arnoldi{T}, range::UnitRange{Int}; lowerBound, upperBound, D, mode) where {T}
+function iterate_arnoldi!(A, λ, arnoldi::Arnoldi{T}, range::UnitRange{Int}; mode) where {T}
     V, H = arnoldi.V, arnoldi.H
     rows = rowvals(A)
     vals = nonzeros(A)
@@ -141,8 +141,12 @@ function iterate_arnoldi!(A, v, arnoldi::Arnoldi{T}, range::UnitRange{Int}; lowe
             V[:, j+1] = spzeros(size(A, 1), 1)
             for i in 1:size(A, 2)
                 #a = A[:, i]
-                c = -1 / (2 * sqrt(v[i]))
-                c = clamp(c, -upperBound / D[i], -lowerBound / D[i])
+                #if λ !== nothing
+                c = -(λ[i] * λ[i])
+                #else
+                #   c = -1 / (2 * sqrt(v[i]))
+                #    c = clamp(c, -upperBound / D[i], -lowerBound / D[i])
+                #end
                 #mul!(w_, a', V[:, j])
                 #w_ = a' * b
                 #mul!(w__, a * c, w_)
@@ -160,28 +164,9 @@ function iterate_arnoldi!(A, v, arnoldi::Arnoldi{T}, range::UnitRange{Int}; lowe
                 #w___ += w__
             end
         elseif mode == "C"
-            V[:, j+1] = spzeros(size(A, 1), 1)
-            tmp = spzeros(size(A, 1), 1)
-            tmp2 = spzeros(size(A, 1), 1)
-            for i in 1:size(A, 2)
-                c = sqrt(1 / (2 * sqrt(v[i])))
-                c = clamp(c, lowerBound / D[i], upperBound / D[i])
-                tmp[i] = c * V[i, j]
-            end
-            #=
-                        for i in 1:size(A, 2)
-                            sum = 0
-                            for k in nzrange(A, i)
-                                sum += vals[k] * tmp[rows[k]]
-                            end
-                            tmp2[i] = sum
-                        end=#
-            tmp2 = A * tmp
-            for i in 1:size(A, 2)
-                c = sqrt(1 / (2 * sqrt(v[i])))
-                c = clamp(c, lowerBound / D[i], upperBound / D[i])
-                V[i, j+1] = -c * tmp2[i]
-            end
+            V[:, j+1] = λ .* V[:, j]
+            V[:, j+1] = A * V[:, j+1]
+            V[:, j+1] = -λ .* V[:, j+1]
         end
         if orthogonalize!(arnoldi, j) === false && j != size(V, 1)
             reinitialize!(arnoldi, j)
