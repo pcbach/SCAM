@@ -1,2 +1,5 @@
-
-Result/exp5/300kn3dlog.txt
+Result/
+MATLABplot/
+*.csv
+/toy.txt
+*.m
