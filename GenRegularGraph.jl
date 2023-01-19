@@ -41,4 +41,4 @@ function Gen(filename, n, d)
     end
 end
 
-Gen("toy.txt", 1000000, 10)
+Gen("BigExample/1e4n5d2.txt", 10000, 10)

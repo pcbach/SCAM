@@ -189,7 +189,6 @@ function CutValue(A, z)
         end
         r[i] = sign(r[i])
     end
-    #disp(r' * A' * A * r / 2)
     return r' * A' * A * r / 2
 
 end
@@ -233,7 +232,7 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
         end
         w, q, λ = ArnoldiGrad(A, v, lowerBound=lowerBound, upperBound=upperBound, D=D, mode=mode, tol=10^(εd0))
         gap = dot(q - v, ∇g(v, lowerBound=lowerBound, upperBound=upperBound, D=D)) / abs(f(v))
-        println(t, " ", abs(f(v)), " ", gap)
+        #println(t, " ", abs(f(v)), " ", gap)
         if logfilename !== nothing
             open(logfilename, "a") do io
                 println(io, gap)
@@ -252,7 +251,7 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
         bestRes = 0
         bestIdx = 0
         for i in 1:numSample
-            cut = CutValue(A, z[i, :]).val
+            cut = CutValue(A, z[i, :])
             if cut > bestRes
                 bestRes = cut
                 bestIdx = i
@@ -264,7 +263,7 @@ function Solve(A, v0; D=ones((1, n)), t0=2, ε=1e-3, lowerBound=0, upperBound=1e
         bestRes = 0
         bestIdx = 0
         for i in 1:numSample
-            cut = CutValue(A, z[i, :]).val
+            cut = CutValue(A, z[i, :])
             if cut > bestRes
                 bestRes = cut
                 bestIdx = i
