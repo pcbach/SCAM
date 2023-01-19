@@ -4,7 +4,6 @@ MATLABplot/
 *.m
 *.eps
 test.jl
-test.jl
 toy.txt
-toy.txt
-test.jl
+*.csv
+GoogleDistance/
